@@ -15,7 +15,7 @@ os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 fullScreen = False
 refreshRate = 60
-scale = 1
+scale = 4
 playFieldWidth = 320
 playFieldHeight = 200
 

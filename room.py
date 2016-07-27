@@ -52,12 +52,15 @@ class Room:
 		self.spriteGroup.draw (screen)
 		self.fgSpriteGroup.draw (screen)
 
-# ===== Visualize blocking rectangles ================================================================================
-#		color = Color (255, 0, 0, 92)
-#		alphaSurface = pygame.Surface ((self.roomWidth, self.roomHeight), pygame.SRCALPHA)
-#		for rect in self.blockList:
-#			rc = rect.copy ()
-#			rc.move_ip (-self.xOffs, -self.yOffs)
-#			alphaSurface.fill (color, rc)
-#		screen.blit (alphaSurface, (self.xOffs, self.yOffs))
+# ===== Visualize blocking rectangles ==================================================================================
+		showBlocks = False
+
+		if showBlocks:
+			color = Color (255, 0, 0, 92)
+			alphaSurface = pygame.Surface ((self.roomWidth, self.roomHeight), pygame.SRCALPHA)
+			for rect in self.blockList:
+				rc = rect.copy ()
+				rc.move_ip (-self.xOffs, -self.yOffs)
+				alphaSurface.fill (color, rc)
+			screen.blit (alphaSurface, (self.xOffs, self.yOffs))
 # ======================================================================================================================
