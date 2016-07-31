@@ -28,7 +28,7 @@ class Room00 (Room):
 		self.LoadBgImage ("images/R00.bgnd.png")
 
 		# Ventillation
-		self.fan = Fan (self.xOffs + 162, self.yOffs + 20, 50, 1)
+		self.fan = Fan (self.xOffs + 165, self.yOffs + 16, 50, 1)
 		self.bgSpriteGroup.add (self.fan)
 
 		# Crate
@@ -59,15 +59,15 @@ class Room00 (Room):
 			self.game.player.SetLeftPos (self.xOffs)
 			self.game.player.SetBottomPos (self.bottomPlatformRect.top)
 		elif position == 'R':
-			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 15)
+			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 20)
 			self.game.player.SetBottomPos (self.bottomPlatformRect.top)
 
 	def Update (self, userInput):
 		Room.Update (self, userInput)
 
-		if self.game.player.rect.right < self.xOffs + 10:
-			self.game.player.SetRightPos (self.xOffs + 10)
-		elif self.game.player.rect.left >= self.xOffs + self.roomWidth - 10:
+		if self.game.player.rect.right < self.xOffs + 15:
+			self.game.player.SetRightPos (self.xOffs + 15)
+		elif self.game.player.rect.left >= self.xOffs + self.roomWidth - 15:
 			self.game.currentLevel.SetCurrentRoom (1, 'L')
 
 	def Draw (self, screen):
@@ -83,7 +83,7 @@ class Room01 (Room):
 
 		#self.blockList.append (pygame.Rect ((left, top), (width, height)))
 
-		self.fan = Fan (self.xOffs + 235, self.yOffs + 21, 180, -1)
+		self.fan = Fan (self.xOffs + 247, self.yOffs + 16, 180, -1)
 		self.bgSpriteGroup.add (self.fan)
 		self.spriteGroup.add (self.game.player)
 
@@ -91,27 +91,33 @@ class Room01 (Room):
 		self.fgSpriteGroup.add (self.wasteBin)
 
 		# Stone
-		self.stone = Stone (self.xOffs + 184, self.yOffs + 72, self.blockList, self.game.player)
+		self.stone = Stone (self.xOffs + 184, self.yOffs + 73, self.blockList, self.game.player)
 		self.bgSpriteGroup.add (self.stone)
 
 		# Stairs
-		self.s0Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 112, 252, 119 - 112)
+		self.s0Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 111, 261, 116 - 111)
 		self.blockList.append (self.s0Rect)
 
-		self.s1Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 104, 243, 112 - 104)
+		self.s1Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 106, 255, 111 - 106)
 		self.blockList.append (self.s1Rect)
 
-		self.s2Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 97, 237, 104 - 97)
+		self.s2Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 101, 249, 106 - 101)
 		self.blockList.append (self.s2Rect)
 
-		self.s3Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 90, 230, 97 - 90)
+		self.s3Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 96, 243, 101 - 96)
 		self.blockList.append (self.s3Rect)
 
-		self.s4Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 81, 222, 90 - 81)
+		self.s4Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 91, 237, 96 - 91)
 		self.blockList.append (self.s4Rect)
 
+		self.s5Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 86, 231, 91 - 86)
+		self.blockList.append (self.s5Rect)
+
+		self.s6Rect = pygame.Rect (self.xOffs + 0, self.yOffs + 81, 225, 86 - 81)
+		self.blockList.append (self.s6Rect)
+
 		# Lower platform
-		self.bottomPlatformRect = pygame.Rect (self.xOffs + 0, self.yOffs + 119, self.roomWidth, self.roomHeight - 119)
+		self.bottomPlatformRect = pygame.Rect (self.xOffs + 0, self.yOffs + 116, self.roomWidth, self.roomHeight - 116)
 		self.blockList.append (self.bottomPlatformRect)
 
 		# Ceiling
@@ -123,17 +129,17 @@ class Room01 (Room):
 	def Enter (self, position):
 		Room.Enter (self, position)
 		if position == 'L':
-			self.game.player.SetRightPos (self.xOffs + 15)
-			self.game.player.SetBottomPos (self.s4Rect.top)
+			self.game.player.SetRightPos (self.xOffs + 20)
+			self.game.player.SetBottomPos (self.s6Rect.top)
 		elif position == 'R':
-			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 15)
+			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 20)
 			self.game.player.SetBottomPos (self.bottomPlatformRect.top)
 
 	def Update (self, userInput):
 		Room.Update (self, userInput)
-		if self.game.player.rect.right <= self.xOffs + 10:
+		if self.game.player.rect.right <= self.xOffs + 15:
 			self.game.currentLevel.SetCurrentRoom (0, 'R')
-		elif self.game.player.rect.left >= self.xOffs + self.roomWidth - 10:
+		elif self.game.player.rect.left >= self.xOffs + self.roomWidth - 15:
 			self.game.currentLevel.SetCurrentRoom (2, 'L')
 
 	def Draw (self, screen):
@@ -149,29 +155,28 @@ class Room02 (Room):
 		self.spriteGroup.add (self.game.player)
 
 		# Lower platform
-		self.bottomPlatformRect = pygame.Rect (self.xOffs + 0, self.yOffs + 120, self.roomWidth, self.roomHeight - 120)
+		self.bottomPlatformRect = pygame.Rect (self.xOffs + 0, self.yOffs + 116, self.roomWidth, self.roomHeight - 116)
 		self.blockList.append (self.bottomPlatformRect)
 
-		# Test blocks
-		for n in range (0, 10):
-			rc = pygame.Rect (self.xOffs + 80 + 4 * n, self.yOffs + 120 - n, 30, 1)
+		# Elevated platform
+		for n in range (0, 5):
+			rc = pygame.Rect (self.xOffs + 56 + 4 * n, self.yOffs + 115 - n, 153 - 8 * n, 1)
 			self.blockList.append (rc)
-
 
 	def Enter (self, position):
 		Room.Enter (self, position)
 		if position == 'L':
-			self.game.player.SetRightPos (self.xOffs + 15)
+			self.game.player.SetRightPos (self.xOffs + 20)
 		elif position == 'R':
-			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 15)
+			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 20)
 		self.game.player.SetBottomPos (self.bottomPlatformRect.top)
 
 	def Update (self, userInput):
 		Room.Update (self, self.game.userInput)
-		if self.game.player.rect.right <= self.xOffs + 10:
+		if self.game.player.rect.right <= self.xOffs + 15:
 			self.game.currentLevel.SetCurrentRoom (1, 'R')
-		elif self.game.player.rect.left > self.xOffs + self.roomWidth - 10:
-			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 10)
+		elif self.game.player.rect.left > self.xOffs + self.roomWidth - 15:
+			self.game.player.SetLeftPos (self.xOffs + self.roomWidth - 15)
 
 	def Draw (self, screen):
 		Room.Draw (self, screen)
