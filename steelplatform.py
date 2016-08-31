@@ -26,8 +26,7 @@ class SteelPlatform (pygame.sprite.Sprite):
 		self.player = player
 
 		self.ticks = pygame.time.get_ticks ()
-		self.updateTime = 50	# ms
-
+		self.updateTime = 16	# ms
 		self.dy = +1
 
 	def update (self):
@@ -45,9 +44,11 @@ class SteelPlatform (pygame.sprite.Sprite):
 			if self.dy > 0:
 				if self.rect.top > self.yPos + 10:
 					self.dy = -1
+					self.updateTime = 50
 			elif self.dy < 0:
 				if self.rect.top < self.yPos - 20:
-					self.dy = +3
+					self.dy = +1
+					self.updateTime = 16
 
 			self.rect.move_ip (0, self.dy)
 

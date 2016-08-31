@@ -27,7 +27,6 @@ class Stone (pygame.sprite.Sprite):
 
 		self.ticks = pygame.time.get_ticks ()
 		self.updateTime = 60	# ms
-
 		self.dx = +1
 
 	def update (self):
@@ -45,9 +44,11 @@ class Stone (pygame.sprite.Sprite):
 			if self.dx > 0:
 				if self.rect.centerx > self.xPos + 40:
 					self.dx = -1
+					self.updateTime = 30	# ms
 			elif self.dx < 0:
 				if self.rect.centerx < self.xPos - 30:
-					self.dx = +2
+					self.dx = +1
+					self.updateTime = 60	# ms
 
 			self.rect.move_ip (self.dx, 0)
 
