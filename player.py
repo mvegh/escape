@@ -8,7 +8,7 @@ from pygame.locals import *
 
 # class Player =========================================================================================================
 
-class Player (pygame.sprite.Sprite):
+class Player(pygame.sprite.Sprite):
 	TileWidth = 40
 	TileHeight = 48
 
@@ -16,6 +16,7 @@ class Player (pygame.sprite.Sprite):
 	State_Idle = 0
 	State_Run = 1
 	State_Jump = 2
+	State_Fall = 3
 
 	# Player animation phase indexes in the player image
 	Phase_Run = 0	# 8 images
@@ -23,63 +24,83 @@ class Player (pygame.sprite.Sprite):
 	Phase_Jump = 9	# 2 images
 
 	# Moving directions
-	Direction_Left = 0
-	Direction_Right = 1
+	Dir_Left = 0
+	Dir_Right = 1
 
-	JumpValue = -14
-	FallingValue = 3
-	StepValue = 3	# Vertical distance that do not block user while running
+	VStepLimit = 3	# Vertical distance that do not block running state
+	HStep = 6		# Horizontal movement distance in pixels
+	HMovementDelay = 12	# Horizontal movement timing (ms)
+
+	YMax = 26.0		# Jump height in pixels
+	TYMax = 300.0	# Time to reach the top position while jumping (ms)
+	VAccel = YMax / (TYMax * TYMax)
 
 	fileImage = None
 
 	def __init__(self, game):
 		pygame.sprite.Sprite.__init__(self)
-		Player.fileImage = pygame.image.load ("images/Player.png").convert_alpha ()
-		self.rect = pygame.Rect (0, 20, 40, 48)
-		self.direction = Player.Direction_Left
+		Player.fileImage = pygame.image.load("images/Player.png").convert_alpha()
+		self.rect = pygame.Rect(0, 20, 40, 48)
+		self.collideRect = self.rect.copy()
+		self.collideRect.inflate_ip(-20, 0)
+
+		self.direction = Player.Dir_Left
+		self.hasHSpeed = False
+
 		self.state = Player.State_Idle
 		self.phaseIndex = 0
 
-		self.dx = 0
-		self.dy = 0
+		self.ticks = pygame.time.get_ticks()
+		self.lastHTicks = 0.0	# Horizontal movement timing
 
-		self.image = Player.fileImage.subsurface (Player.Phase_Idle * Player.TileWidth, self.direction * Player.TileHeight, Player.TileWidth, Player.TileHeight)
+		self.x0 = 0
+		self.y0 = 0	# Vertical start position of jumping/falling (bottom position of the player)
+		self.t0 = self.ticks # Start time of jumping/falling
 
-		self.ticks = pygame.time.get_ticks ()
-		self.updateTime = 65	# ms
 		self.game = game
+		self.image = Player.fileImage.subsurface(Player.Phase_Idle * Player.TileWidth, self.direction * Player.TileHeight, Player.TileWidth, Player.TileHeight)
 
-		self.collideRect = self.rect.copy ()
-		self.collideRect.inflate_ip (-20, 0)
+	def Move(self, dx, dy):
+		self.rect.move_ip(dx, dy)
+		self.collideRect.move_ip(dx, dy)
 
-	def Move (self, dx, dy):
-		self.rect.move_ip (dx, dy)
-		self.collideRect.move_ip (dx, dy)
-
-	def SetLeftPos (self, x):
+	def SetLeftPos(self, x):
 		self.rect.left = x
 		self.collideRect.centerx = self.rect.centerx
 
-	def SetRightPos (self, x):
+	def SetRightPos(self, x):
 		self.rect.right = x
 		self.collideRect.centerx = self.rect.centerx
 
-	def SetBottomPos (self, y):
+	def SetBottomPos(self, y):
 		self.rect.bottom = y
 		self.collideRect.bottom = y
 
-	def GetCollideRect (self):
+	def GetPosition(self):
+		return self.rect.centerx, self.rect.bottom
+
+	def GetCollideRect(self):
 		return self.collideRect
 
-	def CheckVerticalCollision (self, dy):
+	def CalcJumpPos(self, t, t0):
+		'''Calculate vertical position of the player in the jump state'''
+		dt = t - t0 - Player.TYMax
+		return Player.YMax - (Player.VAccel * dt * dt)
+
+	def CalcFallPos(self, t, t0):
+		'''Calculate vertical position of the player in the fall state'''
+		dt = t - t0
+		return Player.VAccel * dt * dt
+
+	def CheckVerticalCollision(self, dy):
 		'''Check and calculate new vertical change with the proposed change value. Value of dy is adjusted to have no collision.'''
 		playerIsOnASurface = False
 
-		rc = self.GetCollideRect ().copy ()
-		rc.move_ip (0, dy) # The proposed new vertical position
-		indexList = rc.collidelistall (self.game.currentLevel.currentRoom.blockList)
+		rc = self.GetCollideRect().copy()
+		rc.move_ip(0, dy) # The proposed new vertical position
+		indexList = rc.collidelistall(self.game.currentLevel.currentRoom.blockList)
 
-		rc = self.GetCollideRect ()
+		rc = self.GetCollideRect()
 		for index in indexList:
 			collidingRect = self.game.currentLevel.currentRoom.blockList[index]
 			# We have collision on bottom or top. Top collision is ignored if there is bottom collision!
@@ -90,15 +111,15 @@ class Player (pygame.sprite.Sprite):
 				dy = collidingRect.bottom - rc.top
 		return dy, playerIsOnASurface
 
-	def CheckHorizontalCollision (self, dx):
+	def CheckHorizontalCollision(self, dx):
 		'''Check and calculate new horizontal change with the proposed change value. Value of dx is adjusted to have no collision.'''
 		hasCollision = False
 
-		rc = self.GetCollideRect ().copy ()
-		rc.move_ip (dx, 0) # The proposed new horizontal position
-		indexList = rc.collidelistall (self.game.currentLevel.currentRoom.blockList)
+		rc = self.GetCollideRect().copy()
+		rc.move_ip(dx, 0) # The proposed new horizontal position
+		indexList = rc.collidelistall(self.game.currentLevel.currentRoom.blockList)
 
-		rc = self.GetCollideRect ()
+		rc = self.GetCollideRect()
 		for index in indexList:
 			collidingRect = self.game.currentLevel.currentRoom.blockList[index]
 			# Check for collision on left and right and adjust horizontal change
@@ -110,182 +131,256 @@ class Player (pygame.sprite.Sprite):
 				hasCollision = True
 		return dx, hasCollision
 
-	def ProcessIdleState (self):
-		if self.game.userInput.left or self.game.userInput.right:
-			self.state = Player.State_Run
+	def SetState(self, newState):
+		self.state = newState
+		self.x0, self.y0 = self.GetPosition ()
+		self.t0 = self.ticks
+		self.lastHTicks = self.ticks
+
+		if newState == Player.State_Idle:
+			self.hasHSpeed = False
+			self.ProcessIdleState (True)
+		elif newState == Player.State_Run:
+			if self.game.userInput.left:
+				self.direction = Player.Dir_Left
+				self.hasHSpeed = True
+			elif self.game.userInput.right:
+				self.direction = Player.Dir_Right
+				self.hasHSpeed = True
 			self.ProcessRunState ()
-			return
-
-		dy = 0
-
-		# ---------------------
-		# Do vertical movement.
-		# ---------------------
-		# Check if the player is on a surface. Check for collision with one pixel down
-		dy, playerIsOnASurface = self.CheckVerticalCollision (1)
-		if not playerIsOnASurface:
-			# No collision, player is in the air. Initiate falling with gravity
-			# Check the new position and adjust vertical change. Bottom collision is updated.
-			dy, playerIsOnASurface = self.CheckVerticalCollision (self.dy + Player.FallingValue)
-
-			# Set new vertical position of the player
-			self.Move (0, dy)
-
-		if playerIsOnASurface and self.game.userInput.up: # Check for jump only after gravity is handled
-			self.dy = Player.JumpValue
+		elif newState == Player.State_Jump:
 			self.ProcessJumpState ()
+		elif newState == Player.State_Fall:
+			self.ProcessFallState ()
+
+	def ProcessIdleState(self, initIdle):
+		if self.game.userInput.left or self.game.userInput.right:
+			self.SetState(Player.State_Run)
 			return
 
-		self.state = Player.State_Idle
-		self.dx = 0
-		self.dy = dy
+		dy = 0.0
 
-	def ProcessRunState (self):
-		if self.game.userInput.left:
-			dx = -6
-		elif self.game.userInput.right:
-			dx = +6
-		else:
-			self.state = Player.State_Idle
-			self.ProcessIdleState ()
+		# ------------------------------
+		# Test and do vertical movement.
+		# ------------------------------
+		# Check if the player is on a (vertically moving?) surface by checking for collision one pixel down.
+		# Change to jump state only if 1.: there it is not on a surface or 2.: up key is pressed and it is on a surface
+		dy, playerIsOnASurface = self.CheckVerticalCollision(1)
+
+		if (playerIsOnASurface and self.game.userInput.up):
+			self.SetState(Player.State_Jump)
+			return
+		elif not playerIsOnASurface:
+			self.SetState(Player.State_Fall)
 			return
 
-		dy = 0
+		#########################################################
+		# TO DO: Check collision with horizontally moving objects
+		#########################################################
 
+		if initIdle:
+			# Set player animation phase
+			self.phaseIndex = 0
+			# Update player image
+			tileIndexX = Player.Phase_Idle
+			tileIndexY = self.direction
+			self.image = Player.fileImage.subsurface(tileIndexX * Player.TileWidth, tileIndexY * Player.TileHeight, Player.TileWidth, Player.TileHeight)
+
+	def ProcessRunState(self):
 		# ---------------------------
 		# Do vertical movement first.
 		# ---------------------------
 		# Check if the player is on a surface. Check for collision with one pixel down
-		dy, playerIsOnASurface = self.CheckVerticalCollision (1)
+		dy = 0
+		dy, playerIsOnASurface = self.CheckVerticalCollision(1)
 		if not playerIsOnASurface:
 			# No collision, player is in the air.
 			# Check the new position and adjust vertical change. Bottom collision is updated.
-			dy, playerIsOnASurface = self.CheckVerticalCollision (self.dy + Player.StepValue)
+			dy, playerIsOnASurface = self.CheckVerticalCollision(dy + Player.VStepLimit)
 
-			# Set new vertical position of the player
-			self.Move (0, dy)
+			if playerIsOnASurface:
+				# Set new vertical position of the player. Player steps down instantly.
+				self.Move(0, dy)
 
 		if not playerIsOnASurface:
-			dx = 0 # Stop horizontal movement if there is no surface below the player
-		elif self.game.userInput.up: # Check for jump only after gravity is handled
-			self.dx = dx
-			self.dy = Player.JumpValue
-			self.state = Player.State_Jump
-			self.ProcessJumpState ()
+			# Stop horizontal movement depends on how long is the user running
+			if self.ticks - self.t0 < 500:
+				self.hasHSpeed = False
+			self.SetState(Player.State_Fall)
 			return
+
+		if self.game.userInput.up: # Check for jump only after gravity is handled
+			self.SetState(Player.State_Jump)
+			return
+
+		# Handle user input
+		if self.game.userInput.left is False and self.game.userInput.right is False:
+			self.SetState(Player.State_Idle)
+			return
+
+		dx = 0
+		dt = self.ticks - self.lastHTicks
+		if dt > 6 * Player.HMovementDelay:
+			self.lastHTicks += 6 * Player.HMovementDelay
+
+			if self.game.userInput.left:
+				dx = -Player.HStep
+				self.direction = Player.Dir_Left
+			elif self.game.userInput.right:
+				dx = +Player.HStep
+				self.direction = Player.Dir_Right
 
 		# -----------------------
 		# Do horizontal movement.
 		# -----------------------
-
-		# Check for horizontal collision
-		dxNew, hasCollision = self.CheckHorizontalCollision (dx)
-
+		# Check for horizontal collision with dx movement against fixed or moving objects
+		dxNew, hasHorizontalCollision = self.CheckHorizontalCollision(dx)
 		# Set new horizontal position
-		if not hasCollision:
-			self.Move (dxNew, 0)
+		if not hasHorizontalCollision:
+			self.Move(dx, 0)
 		else:
-			# Player is colliding with dx movement. Try to step up some pixels and move with dx
-			rc = self.GetCollideRect ().copy ()
-			rc.move_ip (dx, -Player.StepValue) # The proposed new vertical position
-			indexList = rc.collidelistall (self.game.currentLevel.currentRoom.blockList)
-			if len (indexList) == 0:
-				# No collision: step up
-				self.Move (dx, -Player.StepValue)
+			# Player is colliding with dx movement. Try to step up VStepLimit pixels and move with dx then
+			rc = self.GetCollideRect().copy()
+			rc.move_ip(dx, -Player.VStepLimit) # The proposed new vertical position
+			indexList = rc.collidelistall(self.game.currentLevel.currentRoom.blockList)
+			if len(indexList) == 0:
+				# No collision: try to step up on a small block
+				self.Move(dx, -Player.VStepLimit)
+				hasHorizontalCollision = False
 			else:
 				# Collision: move with the modified dx value
-				self.Move (dxNew, 0)
+				self.Move(dxNew, 0)
+				dx = dxNew
+				if dx != 0:
+					hasHorizontalCollision = False
 
 		# Set new player state
-		if dx != 0:
-			self.state = Player.State_Run
-			self.dx = dx
-			self.dy = dy
+		if hasHorizontalCollision:
+			tileIndexX = Player.Phase_Idle
 		else:
-			self.state = Player.State_Idle
-			self.dx = 0
-			self.dy = dy
+			if dx < 0:
+				# Advance player animation phase
+				self.phaseIndex += 1
+				if self.phaseIndex > 7:
+					self.phaseIndex = 0
+				tileIndexX = Player.Phase_Run + self.phaseIndex
+			elif dx > 0:
+				# Advance player animation phase
+				self.phaseIndex += 1
+				if self.phaseIndex > 7:
+					self.phaseIndex = 0
+				tileIndexX = Player.Phase_Run + self.phaseIndex
+			else:
+				return
 
-	def ProcessJumpState (self):
-		dx = self.dx
-		dy = self.dy + Player.FallingValue # Increase speed change (gravity acceleration)
+		# Update player image
+		tileIndexY = self.direction
+
+		self.image = Player.fileImage.subsurface(tileIndexX * Player.TileWidth, tileIndexY * Player.TileHeight, Player.TileWidth, Player.TileHeight)
+
+	def ProcessJumpState(self):
+		yt = self.y0 - self.CalcJumpPos(self.ticks, self.t0)
+		x, bottomPos = self.GetPosition()
+		dy = yt - bottomPos
 
 		# Check the new position and adjust vertical change. Bottom collision is updated.
-		dy, playerIsOnASurface = self.CheckVerticalCollision (dy)
+		dyNew, playerIsOnASurface = self.CheckVerticalCollision(dy)
 
 		# Set new vertical position
-		self.Move (0, dy)
+		self.Move(0, dyNew)
 
 		# Check for horizontal collision
-		dx, hasCollision = self.CheckHorizontalCollision (dx)
+		dx = 0
+		dt = self.ticks - self.lastHTicks
+		if dt > Player.HMovementDelay:
+			self.lastHTicks += Player.HMovementDelay
+			if self.direction == Player.Dir_Left and self.hasHSpeed:
+				dx = -1
+			elif self.direction == Player.Dir_Right and self.hasHSpeed:
+				dx = +1
+
+		dx, hasCollision = self.CheckHorizontalCollision(dx)
 
 		# Set new horizontal position
-		self.Move (dx, 0)
+		self.Move(dx, 0)
+
+		# Set new player state
+		if playerIsOnASurface:
+			if dyNew > 20:
+				self.SetState(Player.State_Idle)	# ->Player dies!
+				return
+			else:
+				self.SetState(Player.State_Idle)
+				return
+		elif dyNew != dy:	# Collision on top
+			self.SetState(Player.State_Fall)
+			return
+
+		self.phaseIndex = 0
+
+		# Update player image
+		tileIndexX = Player.Phase_Jump
+		tileIndexY = self.direction
+
+		self.image = Player.fileImage.subsurface(tileIndexX * Player.TileWidth, tileIndexY * Player.TileHeight, Player.TileWidth, Player.TileHeight)
+
+	def ProcessFallState(self):
+		yt = self.y0 + self.CalcFallPos(self.ticks, self.t0)
+		x, bottomPos = self.GetPosition()
+		dy = yt - bottomPos
+
+		# Check the new position and adjust vertical change. Bottom collision is updated.
+		dy, playerIsOnASurface = self.CheckVerticalCollision(dy)
+
+		# Set new vertical position
+		self.Move(0, dy)
+
+		# Check for horizontal collision
+		dx = 0
+		dt = self.ticks - self.lastHTicks
+		if dt > Player.HMovementDelay:
+			self.lastHTicks += Player.HMovementDelay
+			if self.direction == Player.Dir_Left and self.hasHSpeed:
+				dx = -1
+			elif self.direction == Player.Dir_Right and self.hasHSpeed:
+				dx = +1
+
+		dx, hasCollision = self.CheckHorizontalCollision(dx)
+
+		# Set new horizontal position
+		self.Move(dx, 0)
 
 		# Set new player state
 		if playerIsOnASurface:
 			if dy > 20:
-				self.state = Player.State_Idle	# PLAYER DIES!
+				self.SetState(Player.State_Idle)	# Player dies!
+				return
 			else:
-				self.state = Player.State_Idle
-			self.dx = 0
-			self.dy = 0
-		else:
-			self.state = Player.State_Jump
-			self.dx = dx
-			self.dy = dy
+				self.SetState(Player.State_Idle)
+				return
 
-	def update (self):
+		self.phaseIndex = 0
+
+		# Update player image
+		tileIndexX = Player.Phase_Jump
+		tileIndexY = self.direction
+
+		self.image = Player.fileImage.subsurface(tileIndexX * Player.TileWidth, tileIndexY * Player.TileHeight, Player.TileWidth, Player.TileHeight)
+
+	def update(self):
 		if self.game.currentLevel == None or self.game.currentLevel.currentRoom == None:
 			return
 
-		currentTicks = pygame.time.get_ticks ()
-		if currentTicks > self.ticks + self.updateTime:
-			self.ticks = currentTicks
+		self.ticks = pygame.time.get_ticks()
+#		self.ticks += 10
 
-			if self.state == Player.State_Idle:
-				self.ProcessIdleState ()
-			elif self.state == Player.State_Run:
-				self.ProcessRunState ()
-			elif self.state == Player.State_Jump:
-				self.ProcessJumpState ()
-			else:	# Unknown state
-				pass
-
-			# Advance player animation phase
-			if self.state == Player.State_Run:
-				if self.dx < 0:
-					self.direction = Player.Direction_Left
-					self.phaseIndex += 1
-					if self.phaseIndex > 7:
-						self.phaseIndex = 0
-
-				elif self.dx > 0:
-					self.direction = Player.Direction_Right
-					self.phaseIndex += 1
-					if self.phaseIndex > 7:
-						self.phaseIndex = 0
-			elif self.state == Player.State_Jump:
-				if self.dx < 0:
-					self.direction = Player.Direction_Left
-				elif self.dx > 0:
-					self.direction = Player.Direction_Right
-
-				self.phaseIndex = 0
-			else:
-				self.phaseIndex = 0
-
-			# Update player image
-			tileIndexX = 0
-			tileIndexY = 0
-			if self.state == Player.State_Idle:
-				tileIndexX = Player.Phase_Idle
-				tileIndexY = self.direction
-			elif self.state == Player.State_Run:
-				tileIndexX = Player.Phase_Run + self.phaseIndex
-				tileIndexY = self.direction
-			elif self.state == Player.State_Jump:
-				tileIndexX = Player.Phase_Jump
-				tileIndexY = self.direction
-
-			self.image = Player.fileImage.subsurface (tileIndexX * Player.TileWidth, tileIndexY * Player.TileHeight, Player.TileWidth, Player.TileHeight)
+		if self.state == Player.State_Idle:
+			self.ProcessIdleState(False)
+		elif self.state == Player.State_Run:
+			self.ProcessRunState()
+		elif self.state == Player.State_Jump:
+			self.ProcessJumpState()
+		elif self.state == Player.State_Fall:
+			self.ProcessFallState()
+		else:	# Unknown state
+			pass
