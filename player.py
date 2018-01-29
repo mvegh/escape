@@ -36,6 +36,9 @@ class Player(pygame.sprite.Sprite):
 	VAccel = YMax / (TYMax * TYMax)
 
 	fileImage = None
+	stepSound1 = None
+	stepSound2 = None
+	stepSound3 = None
 
 	def __init__(self, game):
 		pygame.sprite.Sprite.__init__(self)
@@ -59,6 +62,15 @@ class Player(pygame.sprite.Sprite):
 
 		self.game = game
 		self.image = Player.fileImage.subsurface(Player.Phase_Idle * Player.TileWidth, self.direction * Player.TileHeight, Player.TileWidth, Player.TileHeight)
+
+		if Player.stepSound1 == None:
+			Player.stepSound1 = pygame.mixer.Sound ("sounds/FootStep1.ogg")
+		if Player.stepSound2 == None:
+			Player.stepSound2 = pygame.mixer.Sound ("sounds/FootStep2.ogg")
+		if Player.stepSound3 == None:
+			Player.stepSound3 = pygame.mixer.Sound ("sounds/FootStep3.ogg")
+
+		self.sounds = []
 
 	def Move(self, dx, dy):
 		self.rect.move_ip(dx, dy)
@@ -153,7 +165,7 @@ class Player(pygame.sprite.Sprite):
 		elif newState == Player.State_Fall:
 			self.ProcessFallState ()
 
-	def ProcessIdleState(self, initIdle):
+	def ProcessIdleState(self, enterToState):
 		if self.game.userInput.left or self.game.userInput.right:
 			self.SetState(Player.State_Run)
 			return
@@ -178,7 +190,7 @@ class Player(pygame.sprite.Sprite):
 		# TO DO: Check collision with horizontally moving objects
 		#########################################################
 
-		if initIdle:
+		if enterToState:
 			# Set player animation phase
 			self.phaseIndex = 0
 			# Update player image
@@ -216,6 +228,7 @@ class Player(pygame.sprite.Sprite):
 		# Handle user input
 		if self.game.userInput.left is False and self.game.userInput.right is False:
 			self.SetState(Player.State_Idle)
+			self.sounds.append ((Player.stepSound3, 0.2))
 			return
 
 		dx = 0
@@ -273,6 +286,11 @@ class Player(pygame.sprite.Sprite):
 			else:
 				return
 
+			if self.phaseIndex == 3:
+				self.sounds.append ((Player.stepSound1, 0.2))
+			elif self.phaseIndex == 7:
+				self.sounds.append ((Player.stepSound2, 0.2))
+
 		# Update player image
 		tileIndexY = self.direction
 
@@ -308,9 +326,11 @@ class Player(pygame.sprite.Sprite):
 		if playerIsOnASurface:
 			if dyNew > 20:
 				self.SetState(Player.State_Idle)	# ->Player dies!
+				self.sounds.append ((Player.stepSound3, 0.2))
 				return
 			else:
 				self.SetState(Player.State_Idle)
+				self.sounds.append ((Player.stepSound3, 0.2))
 				return
 		elif dyNew != dy:	# Collision on top
 			self.SetState(Player.State_Fall)
@@ -354,9 +374,11 @@ class Player(pygame.sprite.Sprite):
 		if playerIsOnASurface:
 			if dy > 20:
 				self.SetState(Player.State_Idle)	# Player dies!
+				self.sounds.append ((Player.stepSound3, 0.2))
 				return
 			else:
 				self.SetState(Player.State_Idle)
+				self.sounds.append ((Player.stepSound3, 0.2))
 				return
 
 		self.phaseIndex = 0
@@ -384,3 +406,9 @@ class Player(pygame.sprite.Sprite):
 			self.ProcessFallState()
 		else:	# Unknown state
 			pass
+
+		if len(self.sounds) > 0:
+			for snd, vol in self.sounds:
+				snd.set_volume (vol)
+				snd.play ()
+			self.sounds = []

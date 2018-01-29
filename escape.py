@@ -15,7 +15,7 @@ os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 fullScreen = False
 refreshRate = 60	# frames/sec
-scale = 2#2#4
+scale = 4#2#4
 playFieldWidth = 320
 playFieldHeight = 200
 showBlocks = False # Debug option for visualizing blocking objects
@@ -43,8 +43,10 @@ class Game:
 	def __init__(self):
 		self.running = True
 
-		pygame.init()
+		pygame.mixer.pre_init(44100, -16, 2, 1024)	# To avoid sound latency mixer should be initialized first
 		pygame.mixer.init()
+		pygame.init()
+
 		pygame.mouse.set_visible(0)
 		fs = 0
 		if fullScreen:
