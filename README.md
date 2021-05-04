@@ -1,2 +1,2 @@
 # escape
-PyGame test project to implement a simple oldschool platform game.
+PyGame test project to implement a simple platform game.
